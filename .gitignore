@@ -1,0 +1,10 @@
+.ipynb*/
+.virtual_documents/*
+.venv/
+.virtual_documents
+__pycache__/
+*.pyc
+tmp/
+temp/
+*.log
+cache/
