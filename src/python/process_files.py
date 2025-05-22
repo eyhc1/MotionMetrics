@@ -21,11 +21,7 @@ zip_file.close()
 
 os.makedirs(npy_dir, exist_ok=True)
 
-# # combine all files into one
-# frames = [pd.read_csv(file) for file in files]
-# df = pd.concat(frames, ignore_index=True, sort=False).to_csv("test.csv", index=False)
-    
-for label in labels:
+for i, label in enumerate(labels):
     # get all files for the label
     files = glob(f"{root}/Unzipped/**/*{label}*/*.csv", recursive=True)
     print(f"Processing {len(files)} files for label: {label}")
@@ -33,11 +29,10 @@ for label in labels:
     # combine all files into one
     frames = [pd.read_csv(file) for file in files]
     ds = pd.concat(frames, ignore_index=True, sort=False).to_numpy()
-    np.save(f"{npy_dir}/{label}.npy", ds, allow_pickle=False)
-    # df = pd.concat(frames, ignore_index=True, sort=False)
-
-    # # save to csv
-    # df.to_csv(f"{label}.csv", index=False)
+    
+    ds[:, 0] = i  # set the label
+    np.save(f"{npy_dir}/{i}-{label}.npy", ds, allow_pickle=False)
+    df = pd.concat(frames, ignore_index=True, sort=False)
 
 # remove the unzipped files
 shutil.rmtree(f"{root}/Unzipped")
