@@ -11,7 +11,7 @@ except ImportError:
     from tqdm import tqdm
 
 # Define training function
-def train_model(model, train_loader, validation_loader, model_name, device, epochs=64, learning_rate=0.001, models_folder='models'):
+def train_model(model, train_loader, validation_loader, model_name, device, epochs=64, learning_rate=0.001):
     # criterion = nn.BCELoss()
     criterion = nn.CrossEntropyLoss()  # Use CrossEntropyLoss for multi-class classification
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
@@ -85,13 +85,12 @@ def train_model(model, train_loader, validation_loader, model_name, device, epoc
             best_val_accuracy = val_accuracy
             # torch.save(model.state_dict(), os.path.join(models_folder, f"{model_name}_model.pth"))
         
-        print(f"\tTrain Loss: {train_loss:.4f}, \tTrain Acc: {train_accuracy:.4f}, \tVal Loss: {val_loss:.4f}, \tVal Acc: {val_accuracy:.4f}")
+        print(f"\tTrain Loss: {train_loss:.4f}, \n\tTrain Acc: {train_accuracy:.4f}, \n\tVal Loss: {val_loss:.4f}, \n\tVal Acc: {val_accuracy:.4f}")
     
     return history
 
 # Evaluate models on test data
-def evaluate_model(model, test_loader, plots_folder='plots'):
-    os.makedirs(plots_folder, exist_ok=True)
+def evaluate_model(model, test_loader):
     model.eval()
     test_loss = 0.0
     test_correct = 0
