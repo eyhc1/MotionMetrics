@@ -5,11 +5,15 @@ import torch.optim as optim
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
-from tqdm import tqdm
+try:
+    from tqdm.rich import tqdm
+except ImportError:
+    from tqdm import tqdm
 
 # Define training function
 def train_model(model, train_loader, validation_loader, model_name, device, epochs=64, learning_rate=0.001, models_folder='models'):
-    criterion = nn.BCELoss()
+    # criterion = nn.BCELoss()
+    criterion = nn.CrossEntropyLoss()  # Use CrossEntropyLoss for multi-class classification
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
     
     model.to(device)
@@ -33,13 +37,16 @@ def train_model(model, train_loader, validation_loader, model_name, device, epoc
         for data, labels in tqdm(train_loader, desc=f"Epoch {epoch+1}/{epochs}", unit=" batch"):
             optimizer.zero_grad()
             outputs = model(data)
-            loss = criterion(outputs.squeeze(), labels)
+            # loss = criterion(outputs.squeeze(), labels)
+            loss = criterion(outputs, labels.long())
             loss.backward()
             optimizer.step()
             
             train_loss += loss.item()
-            predicted = (outputs.squeeze() > 0.5).float()
+            # predicted = (outputs.squeeze() > 0.5).float()
             train_total += labels.size(0)
+            # train_correct += (predicted == labels).sum().item()
+            predicted = outputs.argmax(dim=1)       # [B]
             train_correct += (predicted == labels).sum().item()
         
         train_accuracy = train_correct / train_total
@@ -54,12 +61,15 @@ def train_model(model, train_loader, validation_loader, model_name, device, epoc
         with torch.no_grad():
             for data, labels in tqdm(validation_loader, desc="Validating", unit=" batch"):
                 outputs = model(data)
-                loss = criterion(outputs.squeeze(), labels)
+                # loss = criterion(outputs.squeeze(), labels)
+                loss = criterion(outputs, labels.long())
                 
                 val_loss += loss.item()
-                predicted = (outputs.squeeze() > 0.5).float()
+                # predicted = (outputs.squeeze() > 0.5).float()
                 val_total += labels.size(0)
+                predicted = outputs.argmax(dim=1)       # [B]
                 val_correct += (predicted == labels).sum().item()
+                train_correct += (predicted == labels).sum().item()
         
         val_accuracy = val_correct / val_total
         val_loss /= len(validation_loader)
@@ -75,8 +85,7 @@ def train_model(model, train_loader, validation_loader, model_name, device, epoc
             best_val_accuracy = val_accuracy
             # torch.save(model.state_dict(), os.path.join(models_folder, f"{model_name}_model.pth"))
         
-        if (epoch + 1) % 10 == 0:
-            print(f'Epoch [{epoch+1}/{epochs}], Train Loss: {train_loss:.4f}, Train Acc: {train_accuracy:.4f}, Val Loss: {val_loss:.4f}, Val Acc: {val_accuracy:.4f}')
+        print(f"\tTrain Loss: {train_loss:.4f}, \tTrain Acc: {train_accuracy:.4f}, \tVal Loss: {val_loss:.4f}, \tVal Acc: {val_accuracy:.4f}")
     
     return history
 
@@ -90,16 +99,19 @@ def evaluate_model(model, test_loader, plots_folder='plots'):
     all_predictions = []
     all_labels = []
     
-    criterion = nn.BCELoss()
+    # criterion = nn.BCELoss()
+    criterion = nn.CrossEntropyLoss()  # Use CrossEntropyLoss for multi-class classification
     
     with torch.no_grad():
-        for data, labels in test_loader:
+        for data, labels in tqdm(test_loader, desc="Testing", unit=" batch"):
             outputs = model(data)
-            loss = criterion(outputs.squeeze(), labels)
+            # loss = criterion(outputs.squeeze(), labels)
+            loss = criterion(outputs, labels.long())
             
             test_loss += loss.item()
-            predicted = (outputs.squeeze() > 0.5).float()
             test_total += labels.size(0)
+            # predicted = (outputs.squeeze() > 0.5).float()
+            predicted = outputs.argmax(dim=1)       # [B]
             test_correct += (predicted == labels).sum().item()
             
             all_predictions.extend(predicted.cpu().numpy())
