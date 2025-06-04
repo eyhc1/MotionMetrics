@@ -17,7 +17,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 from build_data import *
 from train_utils import train_model, evaluate_model
-from model import LSTMModel, LSTMSEQ
+from model import LSTMModel, LSTMRnnModel
 from cyclopts import App
 
 app = App(
@@ -147,6 +147,8 @@ def top(epochs: int,
                     lstm_units=lstm_units, 
                     dense_units=dense_units, 
                     num_classes=num_classes)
+    
+    print(f"Model: {model}")
 
     ################################################################################################
     # SECTION III: MODEL TRAINING
