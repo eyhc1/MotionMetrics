@@ -4,41 +4,31 @@ import torch.nn as nn
 class LSTMModel(nn.Module):
     def __init__(self, input_size, lstm_units, dense_units, num_classes):
         super(LSTMModel, self).__init__()
-        # ADDED: batch norm 
-        self.batch_norm = nn.BatchNorm1d(input_size) 
         
-        self.lstm1 = nn.LSTM(input_size, lstm_units, batch_first=True)
+        # LSTM layer
+        self.lstm = nn.LSTM(input_size=input_size, 
+                           hidden_size=lstm_units, 
+                           batch_first=True,
+                        #    num_layers=num_classes//2
+                           )
         
-        # TODO: determin if we need activation functions for dense layers
-        # Dense layer with ReLU activation
-        self.dense = nn.Linear(lstm_units, dense_units)
+        # Dense layers
+        self.fc1 = nn.Linear(lstm_units, dense_units)
         self.relu = nn.ReLU()
-        
-        # Output layer with Sigmoid (?) activation
-        self.output = nn.Linear(dense_units, num_classes)
+        self.fc2 = nn.Linear(dense_units, num_classes)
         # self.sigmoid = nn.Sigmoid()
         
     def forward(self, x):
-        # Apply batch normalization
-        if len(x.shape) == 3:
-            batch_size, seq_len, features = x.shape
-            x = x.reshape(-1, features)
-            x = self.batch_norm(x)
-            x = x.reshape(batch_size, seq_len, features)
-        else:
-            x = self.batch_norm(x)
-            
-        # LSTM layer
-        x, _ = self.lstm1(x)
-
-        x = torch.max(x, dim=1)[0]  # Global max pooling
+        # x shape: (batch_size, sequence_length, input_size)
+        x, _ = self.lstm(x)
         
-        # Dense layer with ReLU activation
-        x = self.dense(x)
+        # Take the last output of the sequence
+        x = x[:, -1, :]
+        
+        # Pass through dense layers
+        x = self.fc1(x)
         x = self.relu(x)
-        
-        # Output layer with Sigmoid activation
-        x = self.output(x)
+        x = self.fc2(x)
         # x = self.sigmoid(x)
         
         return x
