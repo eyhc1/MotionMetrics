@@ -87,11 +87,17 @@ def top(epochs: int,
     ################################################################################################
     # SECTION I: DATA PREPARATION
     ################################################################################################
+    
+    data_dirs = glob("**/A_DeviceMotion_data", recursive=True)
+    
+    if not data_dirs:
+        import process_files
+        data_dirs = glob("**/A_DeviceMotion_data", recursive=True)
 
     ## Here we set parameter to build labeld time-series from dataset of "(A)DeviceMotion_data"
     ## attitude(roll, pitch, yaw); gravity(x, y, z); rotationRate(x, y, z); userAcceleration(x,y,z)
     trial_codes = [TRIAL_CODES[act] for act in ACT_LABELS]
-    dataset = creat_time_series(set_data_types(["userAcceleration"]), ACT_LABELS, trial_codes, mode="raw", labeled=True, data_dir=glob("**/A_DeviceMotion_data", recursive=True)[0])
+    dataset = creat_time_series(set_data_types(["userAcceleration"]), ACT_LABELS, trial_codes, mode="raw", labeled=True, data_dir=data_dirs[0])
     print("Shape of time-Series dataset:"+str(dataset.shape))    
 
     test_trail = [11,12,13,14,15,16]  

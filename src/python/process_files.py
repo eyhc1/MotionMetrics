@@ -15,6 +15,10 @@ npy_dir = "data/npy"
 
 labels = ["dws", "ups", "sit", "std", "wlk", "jog"]
 
+# make the directories
+if not os.path.exists(f"{root}/data"):
+    os.makedirs(f"{root}/data")
+
 # download the zip file
 url = "https://github.com/mmalekzadeh/motion-sense/raw/refs/heads/master/data/A_DeviceMotion_data.zip"  # contains all the data files
 # url = "https://github.com/mmalekzadeh/motion-sense/raw/refs/heads/master/data/B_Accelerometer_data.zip"  # contains only accelerometer data
