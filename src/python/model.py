@@ -75,3 +75,35 @@ class LSTMRnnModel(nn.Module):
         x = self.dense2(x)
         
         return x
+    
+    
+class LSTMModel2(nn.Module):
+    def __init__(self, input_size, lstm_units, dense_units, num_classes, sequence_length=128):
+        super(LSTMModel2, self).__init__()
+        
+        # LSTM layer
+        self.lstm = nn.LSTM(input_size=input_size, 
+                           hidden_size=lstm_units, 
+                           batch_first=True,
+                        #    num_layers=num_classes//2
+                           )
+        
+        # flatten layer
+        self.flatten = nn.Flatten()
+        
+        # Dense layers
+        self.fc1 = nn.Linear(sequence_length * lstm_units, dense_units)
+        self.relu = nn.ReLU()
+        self.fc2 = nn.Linear(dense_units, num_classes)
+        # self.sigmoid = nn.Sigmoid()
+        
+    def forward(self, x):
+        x, _ = self.lstm(x)
+        
+        x = self.flatten(x)
+        
+        x = self.fc1(x)
+        x = self.relu(x)
+        x = self.fc2(x)
+        
+        return x

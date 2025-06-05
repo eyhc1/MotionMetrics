@@ -7,23 +7,20 @@ import sklearn
 import torch
 try:
     import rich.traceback
-    import rich
     from rich import print
 except ImportError:
     print("Rich library not found. Skipping rich features.")
-    rich = None
 from torch.utils.data import DataLoader, TensorDataset
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 from build_data import *
 from train_utils import train_model, evaluate_model
-from model import LSTMModel, LSTMRnnModel
+from model import *
 from cyclopts import App
 
 app = App(
     name="MotionMetric Training"
 )
-
 
 ACT_LABELS = ["dws","ups", "wlk", "jog", "std", "sit"]
 TRIAL_CODES = {
@@ -35,17 +32,6 @@ TRIAL_CODES = {
     ACT_LABELS[5]:[5,13]
 }
 
-# Set the random seed for numpy
-np.random.seed(1)
-# Set the random seed for PyTorch
-torch.manual_seed(1)
-if torch.cuda.is_available():
-    torch.cuda.manual_seed(1)
-
-# Check if CUDA is available
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-print(f"Using device: {device}")
-
 @app.default
 def top(epochs: int,
           lstm_units: int,
@@ -53,12 +39,14 @@ def top(epochs: int,
           batch_size: int = 1,
           lr: float = 0.001,
           w: int = 128,
-          s: int = 10,
+          s: int = 4,
         #   test_size: float = 0.2,
           validation_size: float = 0.2,
           num_columns: int = 3,
           num_classes: int = len(ACT_LABELS),
-          plots_folder='documents/plots'):
+          plots_folder='documents/plots',
+          set_seed: int = 1,
+          model_dir: str | None = None):
     """
     Main function to train the LSTM model.
     
@@ -74,7 +62,27 @@ def top(epochs: int,
         num_columns (int): Number of columns in each window.
         num_classes (int): Number of classes in the dataset.
         plots_folder (str): Folder to save plots.
+        set_seed (int | None): Random seed for reproducibility. If -1, no seed is set.
+        model_dir (str | None): Directory to save the trained model. If None, the model is not saved.
     """
+    
+    # print out the command entered
+    print(f"Training with parameters: epochs={epochs}, batch_size={batch_size}, lstm_units={lstm_units}, dense_units={dense_units}, lr={lr}, w={w}, s={s}, validation_size={validation_size}, num_columns={num_columns}, num_classes={num_classes}")
+    
+    # Check if CUDA is available
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    print(f"Using device: {device}")
+    
+    # Set random seed for reproducibility# # Set the random seed for numpy
+    if set_seed != -1:
+        np.random.seed(set_seed)
+        # Set the random seed for PyTorch
+        torch.manual_seed(set_seed)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed(set_seed)
+    else:
+        print("-1 set_seed provided, not setting any seed for reproducibility.")
+
 
     ################################################################################################
     # SECTION I: DATA PREPARATION
@@ -167,7 +175,14 @@ def top(epochs: int,
     ################################################################################################
 
     loss, accuracy, predictions, labels = evaluate_model(model, test_loader)
-    print(f"Test Loss: {loss:.4f}, Test Accuracy: {accuracy:.4f}")
+    print(f"Test Loss: {loss:.4f}, Test Accuracy: {accuracy * 100:.2f}%")
+    
+    # save the model if model_dir is provided
+    if model_dir:
+        os.makedirs(model_dir, exist_ok=True)
+        model_path = os.path.join(model_dir, "lstm_model.pth")
+        torch.save(model.state_dict(), model_path)
+        print(f"Model saved to {model_path}")
 
     # Plot the training and validation accuracy curves
     plt.figure(figsize=(12, 5))
