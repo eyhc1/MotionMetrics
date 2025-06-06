@@ -5,11 +5,7 @@ import os
 import sys
 import sklearn
 import torch
-try:
-    import rich.traceback
-    from rich import print
-except ImportError:
-    print("Rich library not found. Skipping rich features.")
+from rich import print
 from torch.utils.data import DataLoader, TensorDataset
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
@@ -67,7 +63,7 @@ def top(epochs: int,
     """
     
     # print out the command entered
-    print(f"Training with parameters: epochs={epochs}, batch_size={batch_size}, lstm_units={lstm_units}, dense_units={dense_units}, lr={lr}, w={w}, s={s}, validation_size={validation_size}, num_columns={num_columns}, num_classes={num_classes}")
+    print(f"Training with parameters: epochs={epochs}, batch_size={batch_size}, lstm_units={lstm_units}, dense_units={dense_units}, lr={lr}, w={w}, s={s}, validation_size={validation_size}, num_columns={num_columns}, num_classes={num_classes}", file="latest-parameters.txt")
     
     # Check if CUDA is available
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -106,51 +102,45 @@ def top(epochs: int,
     train_ts = dataset.loc[~(dataset['trial'].isin(test_trail))]
 
 
-    train_data, act_train, id_train, train_mean, train_std = ts_to_secs(train_ts.copy(),
-                                                                    w,
-                                                                    s,
-                                                                    standardize = True)
-    test_data, act_test, id_test, test_mean, test_std = ts_to_secs(test_ts.copy(),
-                                                                w,
-                                                                s,
-                                                                standardize = True,
-                                                                mean = train_mean, 
-                                                                std = train_std)
+    # train_data, act_train, id_train, train_mean, train_std = ts_to_secs(train_ts.copy(),
+    #                                                                 w,
+    #                                                                 s,
+    #                                                                 standardize = True)
+    # test_data, act_test, id_test, test_mean, test_std = ts_to_secs(test_ts.copy(),
+    #                                                             w,
+    #                                                             s,
+    #                                                             standardize = True,
+    #                                                             mean = train_mean, 
+    #                                                             std = train_std)
+    
+    train_data, act_train, _, _, _ = ts_to_secs(train_ts.copy(), w, s)
+    test_data, act_test, _, _, _ = ts_to_secs(test_ts.copy(), w, s)
+    
+    # transpose the data to have the shape (num_samples, num_features, sequence_length)
+    train_data = train_data.transpose(0, 2, 1)  # (num_samples, sequence_length, num_features)
+    test_data = test_data.transpose(0, 2, 1)    # (num_samples, sequence_length, num_features)
 
+
+    if set_seed != -1:
+        random_state = set_seed
+    else:
+        random_state = None
 
     # TODO: determine if ID needed at all to identify unique subjects
     # Split the training data into training and validation sets
-    train_data, val_data, act_train, act_val, id_train, id_val = train_test_split(train_data, 
-                                                                                act_train, 
-                                                                                id_train, 
-                                                                                test_size=validation_size, 
-                                                                                random_state=1, 
-                                                                                stratify=act_train  # TODO: what is this and do we even need it?
-    )
+    train_data, val_data, act_train, act_val = train_test_split(train_data, act_train, test_size=validation_size, random_state=random_state, stratify=act_train)
 
     print(f"Train data shape: {train_data.shape}, Validation data shape: {val_data.shape}, Test data shape: {test_data.shape}")
     print(f"Train labels shape: {act_train.shape}, Validation labels shape: {act_val.shape}, Test labels shape: {act_test.shape}")
 
-    # convert the data to PyTorch tensors
-    train_data_tensor = torch.tensor(train_data, dtype=torch.float32).permute(0, 2, 1).to(device)
-    val_data_tensor   = torch.tensor(val_data, dtype=torch.float32).permute(0, 2, 1).to(device)
-    test_data_tensor  = torch.tensor(test_data, dtype=torch.float32).permute(0, 2, 1).to(device)
-
-    train_labels_tensor = torch.tensor(act_train, dtype=torch.long).to(device)
-    val_labels_tensor = torch.tensor(act_val, dtype=torch.long).to(device)
-    test_labels_tensor = torch.tensor(act_test, dtype=torch.long).to(device)
-
     # Create DataLoadera with consistent first dimensions.
-    train_dataset = TensorDataset(train_data_tensor, train_labels_tensor)
-    val_dataset = TensorDataset(val_data_tensor, val_labels_tensor)
-    test_dataset = TensorDataset(test_data_tensor, test_labels_tensor)
+    train_dataset = TensorDataset(torch.from_numpy(train_data).float().to(device), torch.from_numpy(act_train).long().to(device))
+    val_dataset = TensorDataset(torch.from_numpy(val_data).float().to(device), torch.from_numpy(act_val).long().to(device))
+    test_dataset = TensorDataset(torch.from_numpy(test_data).float().to(device), torch.from_numpy(act_test).long().to(device))
 
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
-
-    print(f"dim train_data: {train_data_tensor.shape}, dim train_labels: {train_labels_tensor.shape}")
-    print(f"dim val_data: {val_data_tensor.shape}, dim val_labels: {val_labels_tensor.shape}")
 
     ################################################################################################
     # SECTION II: MODEL DEFINITION
@@ -186,7 +176,7 @@ def top(epochs: int,
     # save the model if model_dir is provided
     if model_dir:
         os.makedirs(model_dir, exist_ok=True)
-        model_path = os.path.join(model_dir, "lstm_model.pth")
+        model_path = os.path.join(model_dir, f"lstm_model-accuracy{accuracy:.4f}.pth")
         torch.save(model.state_dict(), model_path)
         print(f"Model saved to {model_path}")
 
