@@ -2,10 +2,12 @@ import numpy as np
 import pandas as pd
 # import rich.traceback
 from glob import glob
-from tqdm import tqdm
-# from rich import print
-
-# rich.traceback.install(show_locals=True)
+try:
+    from tqdm.rich import tqdm
+    # from rich import print
+    # rich.traceback.install(show_locals=True)
+except ImportError:  # 'Rich' library is not installed
+    from tqdm import tqdm
 
 TOTAL_SUBJECTS = 24
 

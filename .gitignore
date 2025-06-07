@@ -12,3 +12,4 @@ cache/
 data/
 # Ignore for now, but may need to be included later
 *pth
+dataset.csv

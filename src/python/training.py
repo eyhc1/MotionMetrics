@@ -3,13 +3,14 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import os
 import sys
-import sklearn
+import requests
 import torch
+from tqdm.rich import tqdm
+from zipfile import ZipFile
 from rich import print
 from torch.utils.data import DataLoader, TensorDataset
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
-from build_data import *
+from build_data import set_data_types, creat_time_series, ts_to_secs
 from train_utils import train_model, evaluate_model
 from model import *
 from cyclopts import App
@@ -18,6 +19,7 @@ app = App(
     name="MotionMetric Training"
 )
 
+# https://github.com/mmalekzadeh/motion-sense#labels
 ACT_LABELS = ["dws","ups", "wlk", "jog", "std", "sit"]
 TRIAL_CODES = {
     ACT_LABELS[0]:[1,2,11],
@@ -28,19 +30,63 @@ TRIAL_CODES = {
     ACT_LABELS[5]:[5,13]
 }
 
+@app.command
+def get_ds(root: str, filename: str = "A_DeviceMotion_data.zip"):
+    """Download and prepare the MotionSense dataset.
+
+    Args:
+        root (str): Root directory where the dataset will be stored.
+        filename (str, optional): Name of the zip file to download. Please refer to https://github.com/mmalekzadeh/motion-sense/raw/refs/heads/master/data for available files.
+    """
+    # make the directories
+    if not os.path.exists(f"{root}"):
+        os.makedirs(f"{root}")
+
+    # download the zip file
+    url = f"https://github.com/mmalekzadeh/motion-sense/raw/refs/heads/master/data/{filename}"
+    filepath = f"{root}/{filename}" 
+
+    # https://stackoverflow.com/questions/37573483/progress-bar-while-download-file-over-http-with-requests
+    response = requests.get(url, stream=True)
+    # Sizes in bytes.
+    total_size = int(response.headers.get("content-length", 0))
+    block_size = 1024
+
+    with tqdm(desc="Downloading dataset...", total=total_size, unit="B", unit_scale=True) as progress_bar:
+        with open(filepath, "wb") as file:
+            for data in response.iter_content(block_size):
+                progress_bar.update(len(data))
+                file.write(data)
+    if total_size != 0 and progress_bar.n != total_size:
+        exit("ERROR: Could not download file")
+
+    # unzip
+    zip_file = ZipFile(filepath)
+    zip_file.extractall(f"{root}")
+    zip_file.close()
+
+    # remove the zip file
+    os.remove(filepath)
+    
+    ## convert to time-series data
+    trial_codes = [TRIAL_CODES[act] for act in ACT_LABELS]
+    
+    creat_time_series(set_data_types(["userAcceleration"]), ACT_LABELS, trial_codes, mode="raw", labeled=True, data_dir=filepath.replace(".zip", "")).to_csv(f"{root}/dataset.csv", index=False)
+    
+
 @app.default
 def top(epochs: int,
-          lstm_units: int,
-          dense_units: int,
           batch_size: int = 1,
-          lr: float = 0.001,
+          lr: float = 3e-4,
           w: int = 128,
           s: int = 4,
-        #   test_size: float = 0.2,
           validation_size: float = 0.2,
           num_columns: int = 3,
+          lstm_units: int = 512,
+          dense_units: int = 128,
           num_classes: int = len(ACT_LABELS),
           plots_folder='documents/plots',
+          root: str = 'data',
           set_seed: int = 1,
           model_dir: str | None = None):
     """
@@ -58,6 +104,7 @@ def top(epochs: int,
         num_columns (int): Number of columns in each window.
         num_classes (int): Number of classes in the dataset.
         plots_folder (str): Folder to save plots.
+        root (str): Root directory for the data files.
         set_seed (int | None): Random seed for reproducibility. If -1, no seed is set.
         model_dir (str | None): Directory to save the trained model. If None, the model is not saved.
     """
@@ -85,37 +132,34 @@ def top(epochs: int,
     # SECTION I: DATA PREPARATION
     ################################################################################################
     
-    data_dirs = glob("**/A_DeviceMotion_data", recursive=True)
+    # check if the csv files exist
+    if not os.path.exists(f"{root}/dataset.csv"):
+        get_ds(root)
+        
+    dataset = pd.read_csv(f"{root}/dataset.csv")
     
-    if not data_dirs:
-        import process_files
-        data_dirs = glob("**/A_DeviceMotion_data", recursive=True)
+    test_trail = [11,12,13,14,15,16]  # split the dataset into train and test sets based on trial numbers (long trials for training, short trials for testing)
 
-    ## Here we set parameter to build labeld time-series from dataset of "(A)DeviceMotion_data"
-    ## attitude(roll, pitch, yaw); gravity(x, y, z); rotationRate(x, y, z); userAcceleration(x,y,z)
-    trial_codes = [TRIAL_CODES[act] for act in ACT_LABELS]
-    dataset = creat_time_series(set_data_types(["userAcceleration"]), ACT_LABELS, trial_codes, mode="raw", labeled=True, data_dir=data_dirs[0])
-    print("Shape of time-Series dataset:"+str(dataset.shape))    
-
-    test_trail = [11,12,13,14,15,16]  
-    print("Test Trials: "+str(test_trail))
     test_ts = dataset.loc[(dataset['trial'].isin(test_trail))]
     train_ts = dataset.loc[~(dataset['trial'].isin(test_trail))]
 
+    # save the train and test data as npy files
+    train_ts.to_csv(f"{root}/train.csv", index=False)
+    test_ts.to_csv(f"{root}/test.csv", index=False)
 
-    # train_data, act_train, id_train, train_mean, train_std = ts_to_secs(train_ts.copy(),
-    #                                                                 w,
-    #                                                                 s,
-    #                                                                 standardize = True)
-    # test_data, act_test, id_test, test_mean, test_std = ts_to_secs(test_ts.copy(),
-    #                                                             w,
-    #                                                             s,
-    #                                                             standardize = True,
-    #                                                             mean = train_mean, 
-    #                                                             std = train_std)
+    train_data, act_train, id_train, train_mean, train_std = ts_to_secs(train_ts.copy(),
+                                                                    w,
+                                                                    s,
+                                                                    standardize = True)
+    test_data, act_test, id_test, test_mean, test_std = ts_to_secs(test_ts.copy(),
+                                                                w,
+                                                                s,
+                                                                standardize = True,
+                                                                mean = train_mean, 
+                                                                std = train_std)
     
-    train_data, act_train, _, _, _ = ts_to_secs(train_ts.copy(), w, s)
-    test_data, act_test, _, _, _ = ts_to_secs(test_ts.copy(), w, s)
+    # train_data, act_train, _, _, _ = ts_to_secs(train_ts.copy(), w, s)
+    # test_data, act_test, _, _, _ = ts_to_secs(test_ts.copy(), w, s)
     
     # transpose the data to have the shape (num_samples, num_features, sequence_length)
     train_data = train_data.transpose(0, 2, 1)  # (num_samples, sequence_length, num_features)
@@ -127,7 +171,6 @@ def top(epochs: int,
     else:
         random_state = None
 
-    # TODO: determine if ID needed at all to identify unique subjects
     # Split the training data into training and validation sets
     train_data, val_data, act_train, act_val = train_test_split(train_data, act_train, test_size=validation_size, random_state=random_state, stratify=act_train)
 
