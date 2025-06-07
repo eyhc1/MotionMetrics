@@ -181,7 +181,13 @@ def top(epochs: int,
         model_path = os.path.join(model_dir, f"lstm_model-accuracy{accuracy:.4f}.pth")
         torch.save(model.state_dict(), model_path)
         print(f"Model saved to {model_path}")
-
+        
+    # print out accuracy for each class
+    print("Test Accuracy per class:")
+    for i, label in enumerate(ACT_LABELS):
+        class_accuracy = np.mean(predictions[labels == i] == i)
+        print(f"\t{label}: {class_accuracy * 100:.2f}%")
+    
     # Plot the training and validation accuracy curves
     plt.figure(figsize=(12, 5))
 
