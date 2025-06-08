@@ -110,7 +110,6 @@ def top(epochs: int,
     """
     
     # print out the command entered
-    print(f"Training with parameters: epochs={epochs}, batch_size={batch_size}, lstm_units={lstm_units}, dense_units={dense_units}, lr={lr}, w={w}, s={s}, validation_size={validation_size}, num_columns={num_columns}, num_classes={num_classes}:", file=open("latest-parameters.log", "a+"))
     print(f"Training with parameters: epochs={epochs}, batch_size={batch_size}, lstm_units={lstm_units}, dense_units={dense_units}, lr={lr}, w={w}, s={s}, validation_size={validation_size}, num_columns={num_columns}, num_classes={num_classes}")
     
     # Check if CUDA is available
@@ -216,6 +215,9 @@ def top(epochs: int,
 
     loss, accuracy, predictions, labels = evaluate_model(model, test_loader)
     print(f"Test Loss: {loss:.4f}, Test Accuracy: {accuracy * 100:.2f}%")
+    
+    # export the information to a log file
+    print(f"Training with parameters: epochs={epochs}, batch_size={batch_size}, lstm_units={lstm_units}, dense_units={dense_units}, lr={lr}, w={w}, s={s}, validation_size={validation_size}, num_columns={num_columns}, num_classes={num_classes}:", file=open("latest-parameters.log", "a+"))
     print(f"\tTest Loss: {loss:.4f}, Test Accuracy: {accuracy * 100:.2f}%", file=open("latest-parameters.log", "a+"))
     
     # save the model if model_dir is provided
