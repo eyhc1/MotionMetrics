@@ -29,5 +29,6 @@ will train a model with 128 epochs and a batch size of 32.
 | Model | Accuracy |  Loss  | Epochs | Batch Size |
 |-------|----------|--------|--------|------------|
 | LSTM  | 0.9702   | 0.3753 | 128    | 32         |
+
 ![Model Performance Graph](documents/plots/training_curves.png "Model Performance Graph")
 `documents/training_output.txt` contains the full training output results.
